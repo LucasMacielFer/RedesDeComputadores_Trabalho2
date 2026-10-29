@@ -24,6 +24,7 @@ namespace Protocol
     struct Message
     {
         ApplicationCode appCode;
+        uint64_t payloadLength;
         std::vector<uint8_t> payload;
     };
 }

@@ -10,8 +10,6 @@
 
 namespace FileTransfer
 {
-    // Le o arquivo em blocos e calcula o SHA-256 durante a leitura.
-    // O digest so e valido depois que o arquivo inteiro foi lido (isFinished()).
     class FileTransferSession
     {
     private:
@@ -27,7 +25,6 @@ namespace FileTransfer
 
         uint64_t getFileSize() const;
         bool isFinished() const;
-        // Verdadeiro se o arquivo terminou antes do esperado (ex.: foi truncado durante o envio).
         bool hasFailed() const;
 
         std::vector<uint8_t> readNextChunk(size_t maxSize);

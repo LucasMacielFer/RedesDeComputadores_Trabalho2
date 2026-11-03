@@ -22,7 +22,6 @@ namespace FileTransfer
 
         void setMetadata(uint64_t totalSize);
         void appendChunk(const std::vector<uint8_t>& data);
-        // O hash chega depois dos dados, na mensagem FILE_HASH.
         void setExpectedDigest(const Sha256Digest& digest);
 
         bool hasMetadata() const;

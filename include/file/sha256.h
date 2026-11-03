@@ -2,6 +2,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <openssl/evp.h>
 
 namespace FileTransfer
 {
@@ -10,15 +11,14 @@ namespace FileTransfer
     class Sha256
     {
     private:
-        uint32_t state[8];
-        uint8_t block[64];
-        size_t blockLength;
-        uint64_t totalLength;
-
-        void processBlock(const uint8_t* data);
+        EVP_MD_CTX* ctx;
 
     public:
         Sha256();
+        ~Sha256();
+
+        Sha256(const Sha256&) = delete;
+        Sha256& operator=(const Sha256&) = delete;
 
         void update(const uint8_t* data, size_t length);
         Sha256Digest finalize() const;

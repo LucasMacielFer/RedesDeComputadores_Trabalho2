@@ -40,12 +40,6 @@ namespace Network
 
     TcpSocket::TcpSocket(bool ipv6)
     {
-        localEndpoint = {};
-        localEndpoint.isIpv6 = ipv6;
-        remoteEndpoint = {};
-        socketIsBound = false;
-        socketIsListening = false;
-        socketIsConnected = false;
         sock = SOCKET_INVALID_VALUE;
 
         if (instanceCount == 0)
@@ -55,8 +49,18 @@ namespace Network
             WSAStartup(MAKEWORD(2, 2), &wsaData);
     #endif
         }
-        // Contado mesmo em caso de falha, pois o destrutor sempre decrementa.
         instanceCount++;
+
+        open(ipv6);
+    }
+
+    void TcpSocket::open(bool ipv6)
+    {
+        close();
+
+        localEndpoint = {};
+        localEndpoint.isIpv6 = ipv6;
+        remoteEndpoint = {};
 
         sock = ::socket(ipv6 ? AF_INET6 : AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
@@ -87,7 +91,6 @@ namespace Network
             return;
         }
 
-        // Permite reutilizar a porta logo apos fechar o servidor (TIME_WAIT).
         int reuse = 1;
         ::setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&reuse), sizeof(reuse));
 
@@ -95,6 +98,9 @@ namespace Network
 
         if (localEndpoint.isIpv6)
         {
+            int v6only = 1;
+            ::setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, reinterpret_cast<const char*>(&v6only), sizeof(v6only));
+
             sockaddr_in6 addr{};
             addr.sin6_family = AF_INET6;
             addr.sin6_port = htons(port);
@@ -158,7 +164,6 @@ namespace Network
             return false;
         }
 
-        // Descarta o descritor que o cliente criou no construtor e assume o aceito.
         clientSocket.close();
         clientSocket.sock = newSock;
         clientSocket.localEndpoint.isIpv6 = (fromAddr.ss_family == AF_INET6);
@@ -288,7 +293,6 @@ namespace Network
 
         if (result == 0)
         {
-            // O par encerrou a conexao.
             socketIsConnected = false;
             return false;
         }

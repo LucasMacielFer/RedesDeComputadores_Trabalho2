@@ -2,6 +2,9 @@
 #include <cstdint>
 #include <vector>
 
+#define SERVER_PORT_IPV4 2005
+#define SERVER_PORT_IPV6 2026
+
 namespace Protocol
 {
     enum ApplicationCode : uint8_t

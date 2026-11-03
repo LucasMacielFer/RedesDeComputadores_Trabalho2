@@ -2,7 +2,6 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <memory>
 #include <string>
 #include <vector>
 #include "file/sha256.h"
@@ -20,8 +19,10 @@ namespace FileTransfer
         Sha256 hasher;
 
     public:
-        FileTransferSession(std::ifstream file, uint64_t fileSize);
+        FileTransferSession();
         ~FileTransferSession();
+
+        bool open(const std::filesystem::path& path);
 
         uint64_t getFileSize() const;
         bool isFinished() const;
@@ -39,6 +40,6 @@ namespace FileTransfer
     public:
         FileSerializer(std::filesystem::path bucketRoot);
         ~FileSerializer();
-        std::shared_ptr<FileTransferSession> open(const std::string& requestedName, Protocol::FileErrorReason& outError) const;
+        bool open(const std::string& requestedName, FileTransferSession& session, Protocol::FileErrorReason& outError) const;
     };
 }

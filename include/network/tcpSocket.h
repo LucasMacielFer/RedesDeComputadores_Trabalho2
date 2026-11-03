@@ -44,9 +44,10 @@ namespace Network
         TcpSocket(const TcpSocket&) = delete;
         TcpSocket& operator=(const TcpSocket&) = delete;
 
+        void open(bool ipv6);
+
         void bind(uint16_t port);
         bool listen(int backlog);
-        // Aceita uma conexao pendente; retorna false em caso de falha.
         bool accept(TcpSocket& clientSocket);
         bool connect(const Endpoint& destEndpoint);
 
@@ -55,9 +56,7 @@ namespace Network
         bool isConnected() const;
         const Endpoint& getRemoteEndpoint() const;
 
-        // Envia todos os bytes (repete ate completar). Retorna false em erro.
         bool send(const uint8_t* data, size_t length);
-        // Recebe ate bufferSize bytes. Retorna false em erro ou se o par fechou a conexao (receivedLength == 0).
         bool recv(uint8_t* buffer, size_t bufferSize, size_t& receivedLength);
         bool waitForData(std::chrono::milliseconds timeout) const;
 

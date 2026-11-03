@@ -20,9 +20,8 @@ namespace FileTransfer
         }
     }
 
-    FileTransferSession::FileTransferSession(std::ifstream file, uint64_t fileSize) :
-        file(std::move(file)),
-        fileSize(fileSize),
+    FileTransferSession::FileTransferSession() :
+        fileSize(0),
         bytesSent(0),
         failed(false)
     {
@@ -32,6 +31,23 @@ namespace FileTransfer
     {
         if (file.is_open())
             file.close();
+    }
+
+    bool FileTransferSession::open(const std::filesystem::path& path)
+    {
+        file.open(path, std::ios::binary);
+        if (!file.is_open())
+            return false;
+
+        std::error_code ec;
+        fileSize = std::filesystem::file_size(path, ec);
+        if (ec)
+        {
+            file.close();
+            return false;
+        }
+
+        return true;
     }
 
     uint64_t FileTransferSession::getFileSize() const
@@ -84,19 +100,19 @@ namespace FileTransfer
     {
     }
 
-    std::shared_ptr<FileTransferSession> FileSerializer::open(const std::string& requestedName, Protocol::FileErrorReason& outError) const
+    bool FileSerializer::open(const std::string& requestedName, FileTransferSession& session, Protocol::FileErrorReason& outError) const
     {
         if (requestedName.empty() || requestedName.find("..") != std::string::npos)
         {
             outError = Protocol::PERMISSION_DENIED;
-            return nullptr;
+            return false;
         }
 
         const std::filesystem::path requested(requestedName);
         if (requested.is_absolute())
         {
             outError = Protocol::PERMISSION_DENIED;
-            return nullptr;
+            return false;
         }
 
         std::error_code ec;
@@ -105,29 +121,21 @@ namespace FileTransfer
         if (ec || !isInside(bucketRoot, candidate))
         {
             outError = Protocol::PERMISSION_DENIED;
-            return nullptr;
+            return false;
         }
 
         if (!std::filesystem::exists(candidate, ec) || !std::filesystem::is_regular_file(candidate, ec))
         {
             outError = Protocol::NOT_FOUND;
-            return nullptr;
+            return false;
         }
 
-        std::ifstream file(candidate, std::ios::binary);
-        if (!file.is_open())
+        if (!session.open(candidate))
         {
             outError = Protocol::NOT_FOUND;
-            return nullptr;
+            return false;
         }
 
-        const uint64_t fileSize = std::filesystem::file_size(candidate, ec);
-        if (ec)
-        {
-            outError = Protocol::NOT_FOUND;
-            return nullptr;
-        }
-
-        return std::make_shared<FileTransferSession>(std::move(file), fileSize);
+        return true;
     }
 }

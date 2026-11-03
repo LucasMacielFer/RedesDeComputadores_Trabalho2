@@ -1,11 +1,11 @@
 #include "protocol/framing.h"
+#include <exception>
 #include <iostream>
 
 namespace Protocol
 {
     namespace
     {
-        // recv() pode devolver menos bytes que o pedido: repete ate completar.
         bool receiveExact(Network::TcpSocket& socket, uint8_t* buffer, size_t length)
         {
             size_t total = 0;
@@ -23,12 +23,6 @@ namespace Protocol
 
     bool sendMessage(Network::TcpSocket& socket, ApplicationCode code, const uint8_t* payload, size_t length)
     {
-        if (length > MAX_PAYLOAD_SIZE)
-        {
-            std::cerr << "ERRO: Payload maior que o maximo permitido." << std::endl;
-            return false;
-        }
-
         std::vector<uint8_t> frame(HEADER_SIZE + length);
         frame[0] = code;
         for (int i = 0; i < 8; i++)
@@ -56,15 +50,18 @@ namespace Protocol
         for (int i = 0; i < 8; i++)
             length = (length << 8) | header[1 + i];
 
-        if (length > MAX_PAYLOAD_SIZE)
-        {
-            std::cerr << "ERRO: Payload maior que o maximo permitido." << std::endl;
-            return false;
-        }
-
         message.appCode = static_cast<ApplicationCode>(header[0]);
         message.payloadLength = length;
-        message.payload.assign(static_cast<size_t>(length), 0);
+
+        try
+        {
+            message.payload.assign(static_cast<size_t>(length), 0);
+        }
+        catch (const std::exception&)
+        {
+            std::cerr << "ERRO: Nao foi possivel alocar o payload da mensagem." << std::endl;
+            return false;
+        }
 
         if (length > 0 && !receiveExact(socket, message.payload.data(), message.payload.size()))
             return false;

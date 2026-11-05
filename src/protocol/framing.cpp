@@ -24,9 +24,10 @@ namespace Protocol
     bool sendMessage(Network::TcpSocket& socket, ApplicationCode code, const uint8_t* payload, size_t length)
     {
         std::vector<uint8_t> frame(HEADER_SIZE + length);
+
         frame[0] = code;
-        for (int i = 0; i < 8; i++)
-            frame[1 + i] = static_cast<uint8_t>(static_cast<uint64_t>(length) >> (56 - 8 * i));
+        for (size_t i = 0; i < PAYLOAD_LENGTH_SIZE; i++)
+            frame[CODE_SIZE + i] = static_cast<uint8_t>(static_cast<uint64_t>(length) >> (8 * (PAYLOAD_LENGTH_SIZE - 1 - i)));
 
         if (length > 0)
             memcpy(frame.data() + HEADER_SIZE, payload, length);
@@ -47,8 +48,8 @@ namespace Protocol
         }
 
         uint64_t length = 0;
-        for (int i = 0; i < 8; i++)
-            length = (length << 8) | header[1 + i];
+        for (size_t i = 0; i < PAYLOAD_LENGTH_SIZE; i++)
+            length = (length << 8) | header[CODE_SIZE + i];
 
         message.appCode = static_cast<ApplicationCode>(header[0]);
         message.payloadLength = length;

@@ -1,4 +1,5 @@
 #include <csignal>
+#include <cstdlib>
 #include "server/server.h"
 
 /*
@@ -28,5 +29,6 @@ int main()
     signal(SIGTERM, onSignal);
 
     server.start();
-    return 0;
+
+    std::_Exit(0);
 }

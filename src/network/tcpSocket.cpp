@@ -59,8 +59,7 @@ namespace Network
     {
         close();
 
-        localEndpoint = {};
-        localEndpoint.isIpv6 = ipv6;
+        isIpv6 = ipv6;
         remoteEndpoint = {};
 
         sock = ::socket(ipv6 ? AF_INET6 : AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -100,7 +99,7 @@ namespace Network
 
         int result;
 
-        if (localEndpoint.isIpv6)
+        if (isIpv6)
         {
             int v6only = 1;
             ::setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, reinterpret_cast<const char*>(&v6only), sizeof(v6only));
@@ -124,11 +123,10 @@ namespace Network
 
         if (result != 0)
         {
-            std::cerr << "ERRO: Erro ao dar bind (" << (localEndpoint.isIpv6 ? "IPv6" : "IPv4") << ")" << std::endl;
+            std::cerr << "ERRO: Erro ao dar bind (" << (isIpv6 ? "IPv6" : "IPv4") << ")" << std::endl;
             return;
         }
 
-        localEndpoint.port = port;
         socketIsBound = true;
     }
 
@@ -170,10 +168,9 @@ namespace Network
 
         clientSocket.close();
         clientSocket.sock = newSock;
-        clientSocket.localEndpoint.isIpv6 = (fromAddr.ss_family == AF_INET6);
+        clientSocket.isIpv6 = (fromAddr.ss_family == AF_INET6);
         fillEndpoint(fromAddr, clientSocket.remoteEndpoint);
         clientSocket.socketIsConnected = true;
-        clientSocket.updateLocalPort();
         clientSocket.enableKeepAlive();
 
         return true;
@@ -187,7 +184,7 @@ namespace Network
             return false;
         }
 
-        if (destEndpoint.isIpv6 != localEndpoint.isIpv6)
+        if (destEndpoint.isIpv6 != isIpv6)
         {
             std::cerr << "ERRO: Tipo de IP do destino nao corresponde ao tipo de IP do socket." << std::endl;
             return false;
@@ -195,7 +192,7 @@ namespace Network
 
         int result;
 
-        if (localEndpoint.isIpv6)
+        if (isIpv6)
         {
             sockaddr_in6 addr{};
             addr.sin6_family = AF_INET6;
@@ -222,24 +219,13 @@ namespace Network
 
         remoteEndpoint = destEndpoint;
         socketIsConnected = true;
-        updateLocalPort();
 
         return true;
-    }
-
-    bool TcpSocket::isBound() const
-    {
-        return socketIsBound;
     }
 
     bool TcpSocket::isListening() const
     {
         return socketIsListening;
-    }
-
-    bool TcpSocket::isConnected() const
-    {
-        return socketIsConnected;
     }
 
     const Endpoint& TcpSocket::getRemoteEndpoint() const
@@ -335,8 +321,10 @@ namespace Network
 
         fd_set readSet;
         FD_ZERO(&readSet);
-        FD_SET(first.sock, &readSet);
-        FD_SET(second.sock, &readSet);
+        if (!SOCKET_IS_INVALID(first.sock))
+            FD_SET(first.sock, &readSet);
+        if (!SOCKET_IS_INVALID(second.sock))
+            FD_SET(second.sock, &readSet);
 
         timeval tv{};
         tv.tv_sec = static_cast<long>(timeout.count() / 1000);
@@ -352,8 +340,8 @@ namespace Network
         if (result <= 0)
             return;
 
-        firstReady = FD_ISSET(first.sock, &readSet);
-        secondReady = FD_ISSET(second.sock, &readSet);
+        firstReady = !SOCKET_IS_INVALID(first.sock) && FD_ISSET(first.sock, &readSet);
+        secondReady = !SOCKET_IS_INVALID(second.sock) && FD_ISSET(second.sock, &readSet);
     }
 
     void TcpSocket::close()
@@ -397,20 +385,5 @@ namespace Network
             std::cerr << "ERRO: Erro ao configurar keepalive" << std::endl;
         }
     #endif
-    }
-
-    void TcpSocket::updateLocalPort()
-    {
-        sockaddr_storage addr{};
-        SockLen addrLen = sizeof(addr);
-
-        if (::getsockname(sock, reinterpret_cast<sockaddr*>(&addr), &addrLen) != 0)
-        {
-            std::cerr << "ERRO: Erro ao obter endereco local." << std::endl;
-            return;
-        }
-
-        fillEndpoint(addr, localEndpoint);
-        socketIsBound = true;
     }
 }

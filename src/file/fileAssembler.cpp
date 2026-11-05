@@ -11,15 +11,10 @@ namespace FileTransfer
     {
     }
 
-    FileAssembler::~FileAssembler()
-    {
-    }
-
     void FileAssembler::setMetadata(uint64_t totalSize)
     {
         expectedSize = totalSize;
         metadataReceived = true;
-        buffer.reserve(static_cast<size_t>(totalSize));
     }
 
     void FileAssembler::appendChunk(const std::vector<uint8_t>& data)
@@ -39,11 +34,6 @@ namespace FileTransfer
         return metadataReceived;
     }
 
-    bool FileAssembler::hasDigest() const
-    {
-        return digestReceived;
-    }
-
     uint64_t FileAssembler::getBytesReceived() const
     {
         return buffer.size();
@@ -52,11 +42,6 @@ namespace FileTransfer
     uint64_t FileAssembler::getExpectedSize() const
     {
         return expectedSize;
-    }
-
-    bool FileAssembler::isComplete() const
-    {
-        return metadataReceived && buffer.size() >= expectedSize;
     }
 
     bool FileAssembler::verifyIntegrity() const

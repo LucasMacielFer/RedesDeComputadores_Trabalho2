@@ -3,7 +3,6 @@ CXXFLAGS ?= -std=c++17 -Wall -Wextra -O2
 CPPFLAGS += -Iinclude -MMD -MP
 LDLIBS   += -pthread -lcrypto
 
-# No Windows (MinGW) e preciso ligar o Winsock.
 ifeq ($(OS),Windows_NT)
     LDLIBS += -lws2_32
     EXE := .exe
@@ -42,5 +41,4 @@ $(BUILD)/%.o: %.cpp
 clean:
 	rm -rf $(BUILD)
 
-# Recompila quando um cabecalho muda (arquivos .d gerados pelo -MMD).
 -include $(CLIENT_OBJ:.o=.d) $(SERVER_OBJ:.o=.d) $(COMMON_OBJ:.o=.d)

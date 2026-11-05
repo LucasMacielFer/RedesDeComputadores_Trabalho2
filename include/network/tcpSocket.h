@@ -36,7 +36,7 @@ namespace Network
     #else
         int sock;
     #endif
-        Endpoint localEndpoint;
+        bool isIpv6;
         Endpoint remoteEndpoint;
         bool socketIsBound;
         bool socketIsListening;
@@ -56,9 +56,7 @@ namespace Network
         bool accept(TcpSocket& clientSocket);
         bool connect(const Endpoint& destEndpoint);
 
-        bool isBound() const;
         bool isListening() const;
-        bool isConnected() const;
         const Endpoint& getRemoteEndpoint() const;
 
         bool send(const uint8_t* data, size_t length);
@@ -70,7 +68,6 @@ namespace Network
         void close();
 
     private:
-        void updateLocalPort();
         void enableKeepAlive();
     };
 }

@@ -93,9 +93,7 @@ namespace Server
             }
             else if (message.appCode == Protocol::CHAT_MSG)
             {
-                const std::string line = "[" + label + "] " + std::string(message.payload.begin(), message.payload.end());
-                server.log(line);
-                server.broadcast(line, this);
+                server.log("[" + label + "] " + std::string(message.payload.begin(), message.payload.end()));
             }
         }
 
@@ -130,8 +128,6 @@ namespace Server
                 return false;
 
             const std::vector<uint8_t> chunk = session.readNextChunk(FILE_CHUNK_SIZE);
-            if (chunk.empty())
-                break;
 
             if (!send(Protocol::DATA, chunk.data(), chunk.size()))
                 return false;

@@ -7,13 +7,6 @@
 
 namespace client
 {
-    enum ClientState
-    {
-        INIT,
-        CONNECTED,
-        DISCONNECTED
-    };
-
     enum ClientMenu
     {
         WAITING_CONNECTION,
@@ -60,7 +53,6 @@ namespace client
     class Client
     {
     private:
-        ClientState state;
         ClientMenu menu;
         Network::TcpSocket socket;
         std::string notice;
@@ -76,9 +68,7 @@ namespace client
 
     public:
         Client();
-        ~Client();
 
-        static bool makeEndpoint(const std::string& ip, uint16_t port, Network::Endpoint& out);
         void run();
     };
 }

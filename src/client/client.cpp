@@ -6,7 +6,6 @@
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
-#include <cstdio>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
@@ -34,8 +33,6 @@ namespace client
         constexpr int KEY_NONE = -1;
         constexpr int KEY_EOF = -2;
         constexpr int KEY_ESC = 27;
-
-        constexpr size_t MAX_CHAT_MESSAGE_SIZE = 1024;
 
     #ifndef _WIN32
         termios savedTermios;
@@ -190,6 +187,21 @@ namespace client
             }
         }
 
+        bool makeEndpoint(const std::string& ip, uint16_t port, Network::Endpoint& out)
+        {
+            out = {};
+
+            if (inet_pton(AF_INET, ip.c_str(), out.ip) == 1)
+                out.isIpv6 = false;
+            else if (inet_pton(AF_INET6, ip.c_str(), out.ip) == 1)
+                out.isIpv6 = true;
+            else
+                return false;
+
+            out.port = port;
+            return true;
+        }
+
         std::string toHex(const uint8_t* data, size_t length)
         {
             std::ostringstream out;
@@ -212,82 +224,76 @@ namespace client
 
             int lastPercent = -1;
 
-            try
+            while (true)
             {
-                while (true)
+                Protocol::Message message;
+                if (!Protocol::receiveMessage(socket, message))
+                    return TransferResult::CONNECTION_LOST;
+
+                switch (message.appCode)
                 {
-                    Protocol::Message message;
-                    if (!Protocol::receiveMessage(socket, message))
-                        return TransferResult::CONNECTION_LOST;
+                case Protocol::FILE_ERROR:
+                    if (message.payload.size() != 1)
+                        return TransferResult::PROTOCOL_ERROR;
 
-                    switch (message.appCode)
+                    info.errorReason = static_cast<Protocol::FileErrorReason>(message.payload[0]);
+                    return TransferResult::SERVER_ERROR;
+
+                case Protocol::METADATA:
+                {
+                    if (message.payload.size() != 8 || assembler.hasMetadata())
+                        return TransferResult::PROTOCOL_ERROR;
+
+                    uint64_t size = 0;
+                    for (uint8_t b : message.payload)
+                        size = (size << 8) | b;
+
+                    assembler.setMetadata(size);
+                    std::cout << "  Metadados recebidos: " << size << " bytes\n" << std::flush;
+                    break;
+                }
+
+                case Protocol::DATA:
+                {
+                    if (!assembler.hasMetadata())
+                        return TransferResult::PROTOCOL_ERROR;
+
+                    assembler.appendChunk(message.payload);
+                    if (assembler.getBytesReceived() > assembler.getExpectedSize())
+                        return TransferResult::PROTOCOL_ERROR;
+
+                    const uint64_t total = assembler.getExpectedSize();
+                    const int percent = total == 0 ? 100 : static_cast<int>(assembler.getBytesReceived() * 100 / total);
+                    if (percent != lastPercent)
                     {
-                    case Protocol::FILE_ERROR:
-                        if (message.payload.size() != 1)
-                            return TransferResult::PROTOCOL_ERROR;
-
-                        info.errorReason = static_cast<Protocol::FileErrorReason>(message.payload[0]);
-                        return TransferResult::SERVER_ERROR;
-
-                    case Protocol::METADATA:
-                    {
-                        if (message.payload.size() != 8 || assembler.hasMetadata())
-                            return TransferResult::PROTOCOL_ERROR;
-
-                        uint64_t size = 0;
-                        for (uint8_t b : message.payload)
-                            size = (size << 8) | b;
-
-                        assembler.setMetadata(size);
-                        std::cout << "  Metadados recebidos: " << size << " bytes\n" << std::flush;
-                        break;
+                        lastPercent = percent;
+                        printProgress(assembler.getBytesReceived(), total);
                     }
+                    break;
+                }
 
-                    case Protocol::DATA:
-                    {
-                        if (!assembler.hasMetadata())
-                            return TransferResult::PROTOCOL_ERROR;
+                case Protocol::FILE_HASH:
+                {
+                    if (message.payload.size() != 32 || !assembler.hasMetadata())
+                        return TransferResult::PROTOCOL_ERROR;
 
-                        assembler.appendChunk(message.payload);
-                        if (assembler.getBytesReceived() > assembler.getExpectedSize())
-                            return TransferResult::PROTOCOL_ERROR;
+                    FileTransfer::Sha256Digest digest;
+                    std::copy(message.payload.begin(), message.payload.end(), digest.begin());
+                    assembler.setExpectedDigest(digest);
 
-                        const uint64_t total = assembler.getExpectedSize();
-                        const int percent = total == 0 ? 100 : static_cast<int>(assembler.getBytesReceived() * 100 / total);
-                        if (percent != lastPercent)
-                        {
-                            lastPercent = percent;
-                            printProgress(assembler.getBytesReceived(), total);
-                        }
-                        break;
-                    }
+                    if (lastPercent != 100)
+                        printProgress(assembler.getBytesReceived(), assembler.getExpectedSize());
+                    std::cout << '\n';
 
-                    case Protocol::FILE_HASH:
-                    {
-                        if (message.payload.size() != 32 || !assembler.hasMetadata())
-                            return TransferResult::PROTOCOL_ERROR;
+                    info.digestHex = toHex(digest.data(), digest.size());
+                    return assembler.verifyIntegrity() ? TransferResult::OK : TransferResult::HASH_MISMATCH;
+                }
 
-                        FileTransfer::Sha256Digest digest;
-                        std::copy(message.payload.begin(), message.payload.end(), digest.begin());
-                        assembler.setExpectedDigest(digest);
-
-                        if (lastPercent != 100)
-                            printProgress(assembler.getBytesReceived(), assembler.getExpectedSize());
-                        std::cout << '\n';
-
-                        info.digestHex = toHex(digest.data(), digest.size());
-                        return assembler.verifyIntegrity() ? TransferResult::OK : TransferResult::HASH_MISMATCH;
-                    }
-
-                    default:
-                        break;
-                    }
+                default:
+                    break;
                 }
             }
-            catch (const std::exception&)
-            {
-                return TransferResult::PROTOCOL_ERROR;
-            }
+        
         }
 
         std::string errorMessageFor(Protocol::FileErrorReason reason)
@@ -378,40 +384,17 @@ namespace client
                 else if (isPrintable(key))
                 {
                     std::lock_guard<std::mutex> lock(chat->outputMutex);
-                    if (chat->input.size() < MAX_CHAT_MESSAGE_SIZE)
-                    {
-                        chat->input.push_back(static_cast<char>(key));
-                        chat->redrawPrompt();
-                    }
+                    chat->input.push_back(static_cast<char>(key));
+                    chat->redrawPrompt();
                 }
             }
         }
     }
 
     Client::Client() :
-        state(INIT),
         menu(WAITING_CONNECTION),
         socket(false)
     {
-    }
-
-    Client::~Client()
-    {
-    }
-
-    bool Client::makeEndpoint(const std::string& ip, uint16_t port, Network::Endpoint& out)
-    {
-        out = {};
-
-        if (inet_pton(AF_INET, ip.c_str(), out.ip) == 1)
-            out.isIpv6 = false;
-        else if (inet_pton(AF_INET6, ip.c_str(), out.ip) == 1)
-            out.isIpv6 = true;
-        else
-            return false;
-
-        out.port = port;
-        return true;
     }
 
     void Client::run()
@@ -519,18 +502,15 @@ namespace client
         if (!socket.connect(endpoint))
         {
             socket.close();
-            state = DISCONNECTED;
             return false;
         }
 
-        state = CONNECTED;
         return true;
     }
 
     void Client::dropConnection(const std::string& reason)
     {
         socket.close();
-        state = DISCONNECTED;
         menu = WAITING_CONNECTION;
         notice = reason;
     }

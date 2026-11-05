@@ -1,10 +1,8 @@
 #pragma once
 #include <atomic>
-#include <cstdint>
 #include <list>
 #include <mutex>
 #include <string>
-#include <thread>
 #include "file/fileSerializer.h"
 #include "network/tcpSocket.h"
 #include "server/connectionThread.h"
@@ -13,23 +11,14 @@
 
 namespace Server
 {
-    enum ServerThreadState
-    {
-        INIT,
-        RUNNING,
-        STOPPED
-    };
-
-
     class Server
     {
     private:
         FileTransfer::FileSerializer serializer;
-        std::atomic<ServerThreadState> state;
+        std::atomic<bool> running;
 
         Network::TcpSocket listener4;
         Network::TcpSocket listener6;
-        std::thread keyboardThread;
 
         std::mutex connectionsMutex;
         std::list<ConnectionThread> connections;
@@ -43,13 +32,12 @@ namespace Server
 
     public:
         Server();
-        ~Server();
 
         void start();
         void stop();
 
         void log(const std::string& line);
-        void broadcast(const std::string& text, const ConnectionThread* exclude);
+        void broadcast(const std::string& text);
         const FileTransfer::FileSerializer& fileSerializer() const;
     };
 }

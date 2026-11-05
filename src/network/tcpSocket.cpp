@@ -16,6 +16,7 @@ namespace Network
 {
     namespace
     {
+
         void fillEndpoint(const sockaddr_storage& addr, Endpoint& endpoint)
         {
             memset(endpoint.ip, 0, 16);
@@ -67,7 +68,10 @@ namespace Network
         if (SOCKET_IS_INVALID(sock))
         {
             std::cerr << "ERRO: Erro ao criar socket" << std::endl;
+            return;
         }
+
+        enableKeepAlive();
     }
 
     TcpSocket::~TcpSocket()
@@ -170,6 +174,7 @@ namespace Network
         fillEndpoint(fromAddr, clientSocket.remoteEndpoint);
         clientSocket.socketIsConnected = true;
         clientSocket.updateLocalPort();
+        clientSocket.enableKeepAlive();
 
         return true;
     }
@@ -365,6 +370,33 @@ namespace Network
         socketIsBound = false;
         socketIsListening = false;
         socketIsConnected = false;
+    }
+
+    void TcpSocket::enableKeepAlive()
+    {
+    #ifdef _WIN32
+        tcp_keepalive settings{};
+        settings.onoff = 1;
+        settings.keepalivetime = KEEPALIVE_IDLE_SECONDS * 1000;
+        settings.keepaliveinterval = KEEPALIVE_INTERVAL_SECONDS * 1000;
+
+        DWORD returned = 0;
+        if (WSAIoctl(sock, SIO_KEEPALIVE_VALS, &settings, sizeof(settings), nullptr, 0, &returned, nullptr, nullptr) != 0)
+            std::cerr << "ERRO: Erro ao configurar keepalive" << std::endl;
+    #else
+        const int on = 1;
+        const int idle = KEEPALIVE_IDLE_SECONDS;
+        const int interval = KEEPALIVE_INTERVAL_SECONDS;
+        const int count = KEEPALIVE_PROBE_COUNT;
+
+        if (::setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on)) != 0 ||
+            ::setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof(idle)) != 0 ||
+            ::setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &interval, sizeof(interval)) != 0 ||
+            ::setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &count, sizeof(count)) != 0)
+        {
+            std::cerr << "ERRO: Erro ao configurar keepalive" << std::endl;
+        }
+    #endif
     }
 
     void TcpSocket::updateLocalPort()

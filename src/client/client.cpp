@@ -35,7 +35,6 @@ namespace client
         constexpr int KEY_EOF = -2;
         constexpr int KEY_ESC = 27;
 
-        constexpr int TRANSFER_IDLE_TIMEOUT_SECONDS = 30;
         constexpr size_t MAX_CHAT_MESSAGE_SIZE = 1024;
 
     #ifndef _WIN32
@@ -212,20 +211,11 @@ namespace client
                 return TransferResult::CONNECTION_LOST;
 
             int lastPercent = -1;
-            int idleSeconds = 0;
 
             try
             {
                 while (true)
                 {
-                    if (!socket.waitForData(std::chrono::seconds(1)))
-                    {
-                        if (++idleSeconds >= TRANSFER_IDLE_TIMEOUT_SECONDS)
-                            return TransferResult::CONNECTION_LOST;
-                        continue;
-                    }
-                    idleSeconds = 0;
-
                     Protocol::Message message;
                     if (!Protocol::receiveMessage(socket, message))
                         return TransferResult::CONNECTION_LOST;

@@ -60,8 +60,6 @@ namespace Server
         return label;
     }
 
-    // Varias threads enviam no mesmo socket (esta, broadcast do teclado e de outros clientes):
-    // cada mensagem inteira e enviada sob o mutex, para os quadros nao se misturarem.
     bool ConnectionThread::send(Protocol::ApplicationCode code, const uint8_t* data, size_t length)
     {
         std::lock_guard<std::mutex> lock(sendMutex);
@@ -80,7 +78,6 @@ namespace Server
     {
         while (!stopRequested)
         {
-            // Timeout curto para reagir ao stop() mesmo sem trafego.
             if (!socket.waitForData(std::chrono::milliseconds(200)))
                 continue;
 
@@ -106,7 +103,6 @@ namespace Server
         finished = true;
     }
 
-    // Retorna false se a conexao nao serve mais.
     bool ConnectionThread::handleRequest(const std::string& filename)
     {
         server.log("[" + label + "] solicitou o arquivo \"" + filename + "\"");
@@ -141,8 +137,6 @@ namespace Server
                 return false;
         }
 
-        // O hash e calculado durante a leitura e segue depois do ultimo DATA.
-        // Se o arquivo foi truncado no meio do envio, o cliente detecta pelo tamanho e pede de novo.
         const FileTransfer::Sha256Digest digest = session.getDigest();
         if (!send(Protocol::FILE_HASH, digest.data(), digest.size()))
             return false;

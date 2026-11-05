@@ -9,9 +9,11 @@
 #ifdef _WIN32
     #include <winsock2.h>
     #include <ws2tcpip.h>
+    #include <mstcpip.h>
 #elif __unix__
     #include <arpa/inet.h>
     #include <netinet/in.h>
+    #include <netinet/tcp.h>
     #include <sys/socket.h>
     #include <sys/select.h>
     #include <unistd.h>
@@ -25,6 +27,9 @@ namespace Network
     {
     private:
         static int instanceCount;
+        static const int KEEPALIVE_IDLE_SECONDS = 30;
+        static const int KEEPALIVE_INTERVAL_SECONDS = 10;
+        static const int KEEPALIVE_PROBE_COUNT = 3;
 
     #ifdef _WIN32
         SOCKET sock;
@@ -66,5 +71,6 @@ namespace Network
 
     private:
         void updateLocalPort();
+        void enableKeepAlive();
     };
 }
